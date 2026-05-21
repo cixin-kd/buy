@@ -1,30 +1,241 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>我的手機不卡卡網站</title>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+  <style>
+    /* 保持您原始的所有 CSS 樣式 */
+    body { font-family: "Noto Sans TC", sans-serif; background: #f5f6fa; margin: 15px; font-size: 24px; color: #333; line-height: 1.5; }
+    h2 { text-align: center; color: #2a2a72; background: #dcd6f7; padding: 20px; border-radius: 12px; font-size: 30px; margin-bottom: 25px; }
+    label { font-size: 24px; font-weight: bold; margin-top: 20px; display: block; color: #222; }
+    input, select, button, textarea { font-size: 24px !important; width: 100%; padding: 18px; margin-top: 10px; box-sizing: border-box; border: 3px solid #888; border-radius: 12px; background: #fff; -webkit-appearance: none; }
+    input:focus, select:focus { border-color: #3f51b5; background: #fffef0; outline: none; }
+    .info-block, .category-block, .item-block { padding: 20px; border-radius: 15px; margin-top: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    .info-block { background: #e3f2fd; border: 2px solid #90caf9; }
+    .category-block { background: #ede7f6; border: 4px solid #b39ddb; position: relative; }
+    .item-block { background: #ffffff; border: 4px solid #81c784; margin-bottom: 10px; }
+    .item-block h3 { margin-top: 0; color: #2e7d32; font-size: 26px; border-bottom: 3px solid #c8e6c9; padding-bottom: 10px; }
+    .total { margin-top: 30px; background: #fff9c4; border: 3px solid #fbc02d; border-radius: 15px; padding: 25px; font-weight: bold; text-align: center; font-size: 32px; color: #d32f2f; }
+    button { background: #3f51b5; color: white; border: none; font-weight: bold; padding: 22px; margin-top: 15px; }
+    .add-btn { background: #4caf50; }
+    .submit-btn { background: #2a2a72; margin-top: 40px; margin-bottom: 60px; font-size: 28px !important; }
+    .remove-btn { background: #e53935; font-size: 20px !important; padding: 12px; width: auto; }
+    #loadingOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.98); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; }
+    .spinner { width: 80px; height: 80px; border: 8px solid #f3f3f3; border-top: 8px solid #3f51b5; border-radius: 50%; animation: spin 1s linear infinite; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
 </head>
 <body>
-    <h1>慈幼採購申請</h1>
-    <button id="btn">點我呼叫 Google 資料</button>
-    <p id="msg">等待點擊...</p>
 
-    <script>
-    const scriptUrl = "https://script.google.com/macros/s/AKfycbyZEqVrkbap_uI3P3nKv9cXugelsqAhB6UhCgPoh02TNTSQp-y_6iuTuUdZuZUNG7p0cg/exec";
+  <div id="loadingOverlay">
+    <div class="spinner"></div>
+    <p style="margin-top:25px; font-weight:bold; color:#3f51b5; font-size:26px;">傳送中，請稍候...</p>
+  </div>
 
-    document.getElementById('btn').onclick = function() {
-        document.getElementById('msg').innerText = '正在讀取...';
-        
-        fetch(scriptUrl)
-            .then(res => res.json())
-            .then(data => {
-                document.getElementById('msg').innerText = data.message + " (時間：" + data.time + ")";
-            })
-            .catch(err => {
-                document.getElementById('msg').innerText = '錯誤：' + err;
-            });
+  <h2>採購申請表單</h2>
+
+  <div class="info-block">
+    <label>👤 申請人姓名：</label>
+    <input type="text" id="applicant" placeholder="請填寫">
+    
+    <label>🏫 班級單位：</label>
+    <select id="classSelect" onchange="onClassChange(this)">
+      <option value="">--請選擇--</option>
+    </select>
+    <input type="text" id="otherClass" placeholder="手寫輸入單位" style="display:none; margin-top:15px; border-color:#f57c00;">
+  </div>
+
+  <div id="categoriesContainer"></div>
+
+  <button type="button" class="add-btn" style="background:#673ab7;" onclick="addCategoryBlock()">➕ 新增採購類別</button>
+
+  <div class="total" id="totalDisplay">總金額：0 元</div>
+
+  <button class="submit-btn" onclick="handleSubmit()">🚀 確定送出</button>
+
+  <script>
+    const categories = ["食材點心","清潔用品","文具","修繕","教學","節慶","保健用品","其他"];
+    const subcategories = {
+      "食材點心": ["廚房食材","加班餐點","幼兒下午點心外叫","其他"],
+      "教學": ["材料","烘焙","教室布置及收納"],
+      "節慶": ["春","夏","秋","冬"],
+      "其他": ["雜項","退費","公務車類"]
     };
-</script>
+    const classes = ["小樹苗","彩虹","晨光","藍天","小精靈","小太陽","晨星","微風","松果","種子","彩雲","小雲朵","廚房","辦公室","其他"];
+
+    window.onload = function() {
+      const classSelect = document.getElementById("classSelect");
+      classes.forEach(c => {
+        const opt = new Option(c, c);
+        classSelect.add(opt);
+      });
+      addCategoryBlock();
+    };
+
+    function onClassChange(sel) {
+      document.getElementById("otherClass").style.display = sel.value === "其他" ? "block" : "none";
+    }
+
+    // 🟡 修改重點：新增類別區塊
+    function addCategoryBlock() {
+      const container = document.getElementById("categoriesContainer");
+      const block = document.createElement("div");
+      block.className = "category-block";
+      
+      let optionsHtml = categories.map(c => `<option value="${c}">${c}</option>`).join('');
+
+      block.innerHTML = `
+        <button type="button" class="remove-btn" style="position:absolute; right:10px; top:10px;" onclick="this.parentNode.remove();updateTotal();">🗑 刪除此類別</button>
+        <label>📂 採購類別：</label>
+        <select class="mainCategory" onchange="onCategoryBlockChange(this)">
+          <option value="">--請選擇--</option>
+          ${optionsHtml}
+        </select>
+        <select class="subCategory" style="display:none; margin-top:15px; border-color:#673ab7;"></select>
+        
+        <div class="itemsContainer" style="margin-top:20px;"></div>
+        <button type="button" class="add-btn" style="font-size:20px !important; padding:12px;" onclick="addItemToBlock(this)">➕ 新增此類別下的品項</button>
+      `;
+      container.appendChild(block);
+      addItemToBlock(block.querySelector('.add-btn'));
+    }
+
+    function onCategoryBlockChange(sel) {
+      const block = sel.parentNode;
+      const sub = block.querySelector(".subCategory");
+      sub.innerHTML = "";
+      if (subcategories[sel.value]) {
+        sub.style.display = "block";
+        subcategories[sel.value].forEach(sc => sub.add(new Option(sc, sc)));
+      } else {
+        sub.style.display = "none";
+      }
+    }
+
+    function addItemToBlock(btn) {
+      const container = btn.parentNode.querySelector(".itemsContainer");
+      const item = document.createElement("div");
+      item.className = "item-block";
+      item.innerHTML = `
+        <h3>📦 品項細節</h3>
+        <label>品名/單位：</label><input type="text" class="item">
+        <label>用途原因：</label><input type="text" class="purpose">
+        <label>備註：</label><input type="text" class="remark">
+        <label>數量：</label><input type="number" class="quantity" min="1" value="1" oninput="updateSubtotal(this)">
+        <label>預估單價：</label><input type="number" class="price" min="0" value="0" oninput="updateSubtotal(this)">
+        <label>小計：</label><input type="text" class="subtotal" readonly value="0" style="background:#eee;">
+        <label>🔗 連結 (選填)：</label><input type="url" class="link">
+        <label>📸 照片 (選填)：</label><input type="file" class="photoFile" accept="image/*">
+        <button type="button" class="remove-btn" style="margin-top:10px;" onclick="this.parentNode.remove();updateTotal();">🗑 刪除此品項</button>
+      `;
+      container.appendChild(item);
+      updateTotal();
+    }
+
+    function updateSubtotal(inputElem) {
+      const block = inputElem.closest(".item-block");
+      const qty = Number(block.querySelector(".quantity").value) || 0;
+      const price = Number(block.querySelector(".price").value) || 0;
+      block.querySelector(".subtotal").value = (qty * price).toFixed(0);
+      updateTotal();
+    }
+
+    function updateTotal() {
+      let total = 0;
+      document.querySelectorAll(".subtotal").forEach(s => total += Number(s.value) || 0);
+      document.getElementById("totalDisplay").textContent = `總金額：${total.toLocaleString()} 元`;
+    }
+
+    async function getFileData(file) {
+      if (!file) return null;
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve({
+          data: reader.result.split(',')[1],
+          name: file.name,
+          mimeType: file.type
+        });
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // 🟢 核心送出邏輯：完全還原您原本的寫法，並適應新的結構
+    async function handleSubmit() {
+      const applicant = document.getElementById('applicant').value.trim();
+      let className = document.getElementById('classSelect').value;
+      if (className === "其他") className = document.getElementById('otherClass').value.trim();
+
+      if (!applicant || !className) { alert("請填寫姓名與班級！"); return; }
+
+      const catBlocks = document.querySelectorAll(".category-block");
+      const payload = { applicant, className, categories: [] };
+
+      document.getElementById('loadingOverlay').style.display = 'flex';
+
+      for (let cb of catBlocks) {
+        const mainCat = cb.querySelector(".mainCategory").value;
+        const subCat = cb.querySelector(".subCategory").value || "";
+        if (!mainCat) continue;
+
+        const items = [];
+        const itemBlocks = cb.querySelectorAll(".item-block");
+        
+        for (let ib of itemBlocks) {
+          const itemName = ib.querySelector(".item").value.trim();
+          if (!itemName) continue;
+
+          let fileInput = ib.querySelector(".photoFile").files[0];
+          let fileObj = await getFileData(fileInput);
+
+          items.push({
+            item: itemName,
+            purpose: ib.querySelector(".purpose").value.trim(),
+            remark: ib.querySelector(".remark").value.trim(),
+            quantity: ib.querySelector(".quantity").value,
+            price: ib.querySelector(".price").value,
+            link: ib.querySelector(".link").value,
+            fileData: fileObj ? fileObj.data : null,
+            fileName: fileObj ? fileObj.name : null,
+            fileMimeType: fileObj ? fileObj.mimeType : null
+          });
+        }
+
+        if (items.length > 0) {
+          payload.categories.push({
+            category: subCat ? `${mainCat} - ${subCat}` : mainCat,
+            items: items
+          });
+        }
+      }
+
+     // 1. 請確保在 script 最上方定義了你的 GAS 網址
+const scriptUrl = "https://script.google.com/macros/s/AKfycby96yi7SNusWvsela0_OMbNBd4ufUE5qZrcWoXRzlSlUPemH3vROefs2Fn17evPdB0L/exec";
+
+// 2. 找到你原本處理送出（例如 submitForm 或是按鈕 click）的地方
+function sendDataToGoogle(data) { // 假設這是你的送出函式
+    
+    // 顯示正在處理中的提示（可依你原本的 UI 調整）
+    alert("正在上傳資料與照片，請稍候..."); 
+
+    // 改用 fetch 傳送資料
+    fetch(scriptUrl, {
+        method: 'POST',
+        body: JSON.stringify(data) // 將表單物件打包成字串送出
+    })
+    .then(res => res.json())
+    .then(response => {
+        if (response.status === 'success') {
+            alert("申請成功！資料已寫入試算表。");
+            // 這裡可以放你原本 withSuccessHandler 裡面的動作（例如清空表單、重新整理等）
+            window.location.reload(); 
+        } else {
+            alert("系統錯誤：" + response.message);
+        }
+    })
+    .catch(err => {
+        alert("連線失敗，請檢查網路設定：" + err);
+    });
+}
+  </script>
 </body>
 </html>
